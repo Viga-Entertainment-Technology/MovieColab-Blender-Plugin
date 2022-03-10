@@ -134,6 +134,13 @@ def render_anim(name):
     bpy.ops.render.render(animation=True,write_still=True, use_viewport=True)
     bpy.ops.render.play_rendered_anim('INVOKE_DEFAULT')
     
+def MessageBox(message = "", title = "Message Box", icon = 'INFO'):
+
+    def draw(self, context):
+        self.layout.label(text=message)
+
+    bpy.context.window_manager.popup_menu(draw, title = title, icon = icon)
+    
 class Sequences(bpy.types.Operator):
     """Tooltip"""
     bl_idname = "object.user_sequence"
@@ -239,10 +246,10 @@ class Create_Shot(bpy.types.Operator):
         statuscode=create_shot_SS(name_SS,shot)
         
         if(statuscode==401):
-           self.report({'ERROR'},"Upload failed")
+           MessageBox("Failed","Sequence Shot version upload",'ERROR')
         
         elif(statuscode==201):
-           self.report({'INFO'},"Success")
+           MessageBox("Success","Sequence Shot version upload")
            
         return{'FINISHED'}
 
@@ -272,10 +279,10 @@ class Create_Shot_sequence(bpy.types.Operator):
         statuscode=create_shot_sequence(name_Seq,shot)
         
         if(statuscode==401):
-           self.report({'ERROR'},"Upload failed")
+           MessageBox("Failed","Sequence Shot version upload",'ERROR')
         
         elif(statuscode==201):
-           self.report({'INFO'},"Success")
+           MessageBox("Success","Sequence Shot version upload")
            
         return{'FINISHED'}
 
@@ -372,10 +379,10 @@ class AddUser(bpy.types.Operator):
         token_dict=get_token(mycred.Email,mycred.Password)
         if(token_dict.status_code<300):
            token=token_dict.json()['access']
-           self.report({'INFO'},"Login successful")
+           MessageBox("Successful","Login")
            
         else:
-           self.report({'ERROR'},"Login Failed")
+           MessageBox("Failed","Login",'ERROR')
            
         return{'FINISHED'}
     
@@ -641,10 +648,10 @@ class upload_asset_sequence(bpy.types.Operator):
         statuscode=create_asset_version(name_asset,Asset)
         
         if(statuscode==401):
-           self.report({'ERROR'},"Upload failed")
+           MessageBox("Failed","Asset Sequence upload",'ERROR')
         
         elif(statuscode==201):
-           self.report({'INFO'},"Success")
+           MessageBox("Success","Asset Sequence upload")
            
         return{'FINISHED'}
        
