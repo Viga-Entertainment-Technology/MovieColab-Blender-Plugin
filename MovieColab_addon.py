@@ -56,12 +56,10 @@ def get_token(mail, password):
     global filepath
     global directory
     if(res.status_code<300):
-       access_token=res.json()['access']
+       access_token=res
        filepath = bpy.data.filepath
        directory = os.path.dirname(filepath)      
-    else:
-        print('Invalid login')
- 
+       
     return access_token
 
 def get_project():
@@ -227,7 +225,18 @@ class Create_Shot(bpy.types.Operator):
     def execute(self, context):
         mycred=bpy.context.scene.cred
         shot=shots['results'][shot_dict[mycred.Shot]]['id']
-        statuscode=create_shot_SS(name,shot)
+        version=get_Shot_version(shots['results'][shot_dict[mycred.Shot]]['id'])
+        
+        if(version['count']!=0):
+           index=version['count']-1
+           version_name=version['results'][index]['name']
+           shot_num=int(version_name[version_name.find('v')+2:])+1
+           name_SS=mycred.Shot.replace(" ","_")+'.'+mycred.Task.replace(" ","_")+'.'+'v'+(3-len(str(shot_num)))*"0"+str(shot_num)
+       
+        else:
+           name_SS=mycred.Shot.replace(" ","_")+'.'+mycred.Task.replace(" ","_")+'.'+"v001"
+           
+        statuscode=create_shot_SS(name_SS,shot)
         
         if(statuscode==401):
            self.report({'ERROR'},"Upload failed")
@@ -249,7 +258,18 @@ class Create_Shot_sequence(bpy.types.Operator):
     def execute(self, context):
         mycred=bpy.context.scene.cred
         shot=shots['results'][shot_dict[mycred.Shot]]['id']
-        statuscode=create_shot_sequence(name,shot)
+        version=get_Shot_version(shots['results'][shot_dict[mycred.Shot]]['id'])
+        
+        if(version['count']!=0):
+           index=version['count']-1
+           version_name=version['results'][index]['name']
+           shot_num=int(version_name[version_name.find('v')+2:])+1
+           name_Seq=mycred.Shot.replace(" ","_")+'.'+mycred.Task.replace(" ","_")+'.'+'v'+(3-len(str(shot_num)))*"0"+str(shot_num)
+       
+        else:
+           name_Seq=mycred.Shot.replace(" ","_")+'.'+mycred.Task.replace(" ","_")+'.'+"v001"
+           
+        statuscode=create_shot_sequence(name_Seq,shot)
         
         if(statuscode==401):
            self.report({'ERROR'},"Upload failed")
@@ -349,7 +369,14 @@ class AddUser(bpy.types.Operator):
     def execute(self, context):
         mycred=bpy.context.scene.cred
         global token
-        token=get_token(mycred.Email,mycred.Password)
+        token_dict=get_token(mycred.Email,mycred.Password)
+        if(token_dict.status_code<300):
+           token=token_dict.json()['access']
+           self.report({'INFO'},"Login successful")
+           
+        else:
+           self.report({'ERROR'},"Login Failed")
+           
         return{'FINISHED'}
     
 class LogOut(bpy.types.Operator):
@@ -585,7 +612,7 @@ class Render_asset(bpy.types.Operator):
            name_asset=mycred.Assets_list.replace(" ","_")+'.'+'v'+(3-len(str(shot_num)))*"0"+str(shot_num)
        
         else:
-           name_asset=mycred.Assets.replace(" ","_")+'.'+"v001"  
+           name_asset=mycred.Assets_list.replace(" ","_")+'.'+"v001"  
         render_anim(name_asset)
 
         return{'FINISHED'}
@@ -602,6 +629,15 @@ class upload_asset_sequence(bpy.types.Operator):
     def execute(self, context):
         mycred=bpy.context.scene.cred
         Asset=asset['results'][asset_dict[mycred.Assets_list]]['id']
+        
+        if(asset_version['count']!=0):
+           version_name=mycred.Asset_version
+           shot_num=int(version_name[version_name.find('v')+2:])+1
+           Name=mycred.Assets_list.replace(" ","_")+'.'+'v'+(3-len(str(shot_num)))*"0"+str(shot_num)
+       
+        else:
+           Name=mycred.Assets_list.replace(" ","_")+'.'+"v001"  
+           
         statuscode=create_asset_version(name_asset,Asset)
         
         if(statuscode==401):
