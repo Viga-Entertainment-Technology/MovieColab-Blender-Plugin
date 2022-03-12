@@ -22,6 +22,8 @@ directory = ""
 MOVCOLAB_URL= 'https://movie-colab-dev-rvz2hoyrua-as.a.run.app/'
 SSO_URL='https://viga-sso-stage-u44si7afja-as.a.run.app/'
 
+valid=False
+
 token=""
 project={}# stores project info{id,name} 
 Project_names=[]
@@ -46,44 +48,49 @@ Asset_names=[]
 name=""
 asset_version={}
 
+first_login=0
+
+x=""
+
 def get_token(mail, password):
-    s = requests.Session()
     details = {
         'email': mail,
         'password': password
     }
-    res = s.post(SSO_URL+"api/token/", json=details)
+    res = requests.post(SSO_URL+"api/token/", json=details)
     global filepath
     global directory
+    global token
+    global first_login
+    global x
     if(res.status_code<300):
        access_token=res
        filepath = bpy.data.filepath
-       directory = os.path.dirname(filepath)      
-       
-    return access_token
+       directory = os.path.dirname(filepath)
+       token=res.json()['access']
+       first_login=1
+       x=token      
+       return True
+    else:
+       return False
 
 def get_project():
-    x=token
     r=requests.get(MOVCOLAB_URL+"project/",headers={'Authorization':'Bearer '+str(x)})
     return r.json()    
 
 def get_sequences(project_id):
-    x=token
     r=requests.get(MOVCOLAB_URL+"trackables/shot-sequence?project="+str(project_id),headers={'Authorization':'Bearer '+str(x)})
     return r.json() 
 
 def get_shot(project_id,sequence_id):
-    x=token
     r=requests.get(MOVCOLAB_URL+"trackables/shot?project="+str(project_id)+"&parent_sequence="+str(sequence_id),headers={'Authorization':'Bearer '+x})
     return r.json()
 
 def get_Shot_version(shot_id):
-    x=token
     r=requests.get(MOVCOLAB_URL+"trackables/shot-version?shot="+str(shot_id),headers={'Authorization':'Bearer '+x})
     return(r.json())
 
 def create_shot_SS(name,shot):
-    x=token
     data={ 
 
         "name": "String", 
@@ -99,7 +106,6 @@ def create_shot_SS(name,shot):
     return (r.status_code)
     
 def create_shot_sequence(name,shot):
-    x=token
     data={ 
 
         "name": "String", 
@@ -115,7 +121,6 @@ def create_shot_sequence(name,shot):
     return (r.status_code)
 
 def get_task(project_id,shot_id):
-    x=token
     r=requests.get(MOVCOLAB_URL+"trackables/task/?project="+str(project_id)+"&linked="+str(shot_id)+"&assigned=1",headers={'Authorization':'Bearer '+str(x)})
     return r.json()  
 
@@ -157,13 +162,18 @@ class Sequences(bpy.types.Operator):
         sequences_names.clear()
         global sequence_dict
         sequence_dict.clear()
-        sequences=get_sequences(project['results'][project_dict[mycred.Project]]['id'])
         
-        for i in range(sequences['count']):
-            sequence_dict[sequences['results'][i]['code']]=i
+        if(mycred.Project!=""):
+             sequences=get_sequences(project['results'][project_dict[mycred.Project]]['id'])
+        
+             for i in range(sequences['count']):
+                 sequence_dict[sequences['results'][i]['code']]=i
             
-        for i in range(sequences['count']):
-            sequences_names.append((sequences['results'][i]['code'],sequences['results'][i]['code'],""))
+             for i in range(sequences['count']):
+                 sequences_names.append((sequences['results'][i]['code'],sequences['results'][i]['code'],""))
+                 
+        else:
+             MessageBox("No projects available","Sequence")
              
         return{'FINISHED'}
     
@@ -185,13 +195,15 @@ class ProjectInfo(bpy.types.Operator):
         global project_dict
         project_dict.clear()
         project=get_project()
-        #Create project dictionary 
-        for i in range(project['count']):
-            project_dict[project['results'][i]['name']]=i
+        #Create project dictionary
+        if(valid): 
+            for i in range(project['count']):
+                project_dict[project['results'][i]['name']]=i
             
-        for i in range(project['count']):
-            Project_names.append((project['results'][i]['name'],project['results'][i]['name'],""))
-            
+            for i in range(project['count']):
+                Project_names.append((project['results'][i]['name'],project['results'][i]['name'],""))
+        else:
+            MessageBox("Can't access projects","Projects",'ERROR')   
         return{'FINISHED'}
                     
 class Shot_list(bpy.types.Operator):
@@ -210,14 +222,18 @@ class Shot_list(bpy.types.Operator):
         Shot_names.clear()
         global shot_dict
         shot_dict.clear()
-        shots=get_shot(project['results'][project_dict[mycred.Project]]['id'],sequences['results'][sequence_dict[mycred.Sequence]]['id'])
         
-        for i in range(shots['count']):
-            shot_dict[shots['results'][i]['code']]=i
+        if(mycred.Project!="" and mycred.Sequence!=""):
+            shots=get_shot(project['results'][project_dict[mycred.Project]]['id'],sequences['results'][sequence_dict[mycred.Sequence]]['id'])
+        
+            for i in range(shots['count']):
+                shot_dict[shots['results'][i]['code']]=i
             
-        for i in range(shots['count']):
-            Shot_names.append((shots['results'][i]['code'],shots['results'][i]['code'],""))
-         
+            for i in range(shots['count']):
+                Shot_names.append((shots['results'][i]['code'],shots['results'][i]['code'],""))
+        
+        else:
+            MessageBox("No sequence available","Shot")
         return{'FINISHED'}
     
 class Create_Shot(bpy.types.Operator):
@@ -231,26 +247,30 @@ class Create_Shot(bpy.types.Operator):
 
     def execute(self, context):
         mycred=bpy.context.scene.cred
-        shot=shots['results'][shot_dict[mycred.Shot]]['id']
-        version=get_Shot_version(shots['results'][shot_dict[mycred.Shot]]['id'])
+        if(mycred.Shot!=""):
+           shot=shots['results'][shot_dict[mycred.Shot]]['id']
+           version=get_Shot_version(shots['results'][shot_dict[mycred.Shot]]['id'])
         
-        if(version['count']!=0):
-           index=version['count']-1
-           version_name=version['results'][index]['name']
-           shot_num=int(version_name[version_name.find('v')+2:])+1
-           name_SS=mycred.Shot.replace(" ","_")+'.'+mycred.Task.replace(" ","_")+'.'+'v'+(3-len(str(shot_num)))*"0"+str(shot_num)
+           if(version['count']!=0):
+              index=version['count']-1
+              version_name=version['results'][index]['name']
+              shot_num=int(version_name[version_name.find('v')+2:])+1
+              name_SS=mycred.Shot.replace(" ","_")+'.'+mycred.Task.replace(" ","_")+'.'+'v'+(3-len(str(shot_num)))*"0"+str(shot_num)
        
+           else:
+              name_SS=mycred.Shot.replace(" ","_")+'.'+mycred.Task.replace(" ","_")+'.'+"v001"
+           
+           statuscode=create_shot_SS(name_SS,shot)
+        
+           if(statuscode==401):
+              MessageBox("Failed","Sequence Shot version upload",'ERROR')
+        
+           elif(statuscode==201):
+              MessageBox("Success","Sequence Shot version upload")
+              
         else:
-           name_SS=mycred.Shot.replace(" ","_")+'.'+mycred.Task.replace(" ","_")+'.'+"v001"
-           
-        statuscode=create_shot_SS(name_SS,shot)
-        
-        if(statuscode==401):
-           MessageBox("Failed","Sequence Shot version upload",'ERROR')
-        
-        elif(statuscode==201):
-           MessageBox("Success","Sequence Shot version upload")
-           
+              MessageBox("No shots to upload","Sequence Shot version upload")
+              
         return{'FINISHED'}
 
 class Create_Shot_sequence(bpy.types.Operator):
@@ -264,26 +284,29 @@ class Create_Shot_sequence(bpy.types.Operator):
 
     def execute(self, context):
         mycred=bpy.context.scene.cred
-        shot=shots['results'][shot_dict[mycred.Shot]]['id']
-        version=get_Shot_version(shots['results'][shot_dict[mycred.Shot]]['id'])
+        if(mycred.Shot!=""):
+           shot=shots['results'][shot_dict[mycred.Shot]]['id']
+           version=get_Shot_version(shots['results'][shot_dict[mycred.Shot]]['id'])
         
-        if(version['count']!=0):
-           index=version['count']-1
-           version_name=version['results'][index]['name']
-           shot_num=int(version_name[version_name.find('v')+2:])+1
-           name_Seq=mycred.Shot.replace(" ","_")+'.'+mycred.Task.replace(" ","_")+'.'+'v'+(3-len(str(shot_num)))*"0"+str(shot_num)
+           if(version['count']!=0):
+              index=version['count']-1
+              version_name=version['results'][index]['name']
+              shot_num=int(version_name[version_name.find('v')+2:])+1
+              name_Seq=mycred.Shot.replace(" ","_")+'.'+mycred.Task.replace(" ","_")+'.'+'v'+(3-len(str(shot_num)))*"0"+str(shot_num)
        
+           else:
+              name_Seq=mycred.Shot.replace(" ","_")+'.'+mycred.Task.replace(" ","_")+'.'+"v001"
+           
+           statuscode=create_shot_sequence(name_Seq,shot)
+        
+           if(statuscode==401):
+              MessageBox("Failed","Sequence Shot version upload",'ERROR')
+          
+           elif(statuscode==201):
+              MessageBox("Success","Sequence Shot version upload")
+           
         else:
-           name_Seq=mycred.Shot.replace(" ","_")+'.'+mycred.Task.replace(" ","_")+'.'+"v001"
-           
-        statuscode=create_shot_sequence(name_Seq,shot)
-        
-        if(statuscode==401):
-           MessageBox("Failed","Sequence Shot version upload",'ERROR')
-        
-        elif(statuscode==201):
-           MessageBox("Success","Sequence Shot version upload")
-           
+            MessageBox("No shots to upload","Sequence Shot version upload")
         return{'FINISHED'}
 
 class Tasks(bpy.types.Operator):
@@ -302,15 +325,17 @@ class Tasks(bpy.types.Operator):
         Task_names.clear()
         global task_dict
         task_dict.clear()
-        tasks=get_task(project['results'][project_dict[mycred.Project]]['id'],shots['results'][shot_dict[mycred.Shot]]['id'])
+        if(mycred.Project!="" and mycred.Shot!=""):
+             tasks=get_task(project['results'][project_dict[mycred.Project]]['id'],shots['results'][shot_dict[mycred.Shot]]['id'])
         
-        for i in range(tasks['count']):
-            task_dict[tasks['results'][i]['name']]=i
+             for i in range(tasks['count']):
+                   task_dict[tasks['results'][i]['name']]=i
             
-        for i in range(tasks['count']):
-            Task_names.append((tasks['results'][i]['name'],tasks['results'][i]['name'],""))
-        
-        print(tasks)    
+             for i in range(tasks['count']):
+                   Task_names.append((tasks['results'][i]['name'],tasks['results'][i]['name'],""))
+        else:
+             MessageBox("No shots available","Tasks")  
+              
         return{'FINISHED'}
 
 class Render(bpy.types.Operator):
@@ -325,18 +350,21 @@ class Render(bpy.types.Operator):
     def execute(self, context):
         mycred=bpy.context.scene.cred
         global name
-        version=get_Shot_version(shots['results'][shot_dict[mycred.Shot]]['id'])
-        if(version['count']!=0):
-           index=version['count']-1
-           version_name=version['results'][index]['name']
-           shot_num=int(version_name[version_name.find('v')+2:])+1
-           name=mycred.Shot.replace(" ","_")+'.'+mycred.Task.replace(" ","_")+'.'+'v'+(3-len(str(shot_num)))*"0"+str(shot_num)
+        if(mycred.Shot!=""):
+           version=get_Shot_version(shots['results'][shot_dict[mycred.Shot]]['id'])
+           if(version['count']!=0):
+              index=version['count']-1
+              version_name=version['results'][index]['name']
+              shot_num=int(version_name[version_name.find('v')+2:])+1
+              name=mycred.Shot.replace(" ","_")+'.'+mycred.Task.replace(" ","_")+'.'+'v'+(3-len(str(shot_num)))*"0"+str(shot_num)
        
-        else:
-           name=mycred.Shot.replace(" ","_")+'.'+mycred.Task.replace(" ","_")+'.'+"v001"
+           else:
+              name=mycred.Shot.replace(" ","_")+'.'+mycred.Task.replace(" ","_")+'.'+"v001"
            
-        render_and_save(name)
-        print(name)
+           render_and_save(name)
+           
+        else:
+            MessageBox("No shot version available","Render")
         return{'FINISHED'}
     
 class Render_animation(bpy.types.Operator):
@@ -351,17 +379,22 @@ class Render_animation(bpy.types.Operator):
     def execute(self, context): 
         mycred=bpy.context.scene.cred    
         global name
-        version=get_Shot_version(shots['results'][shot_dict[mycred.Shot]]['id'])
-        if(version['count']!=0):
-           index=version['count']-1
-           version_name=version['results'][index]['name']
-           shot_num=int(version_name[version_name.find('v')+2:])+1
-           name=mycred.Shot.replace(" ","_")+'.'+mycred.Task.replace(" ","_")+'.'+'v'+(3-len(str(shot_num)))*"0"+str(shot_num)
+        if(mycred.Shot!=""):
+           version=get_Shot_version(shots['results'][shot_dict[mycred.Shot]]['id'])
+           if(version['count']!=0):
+              index=version['count']-1
+              version_name=version['results'][index]['name']
+              shot_num=int(version_name[version_name.find('v')+2:])+1
+              name=mycred.Shot.replace(" ","_")+'.'+mycred.Task.replace(" ","_")+'.'+'v'+(3-len(str(shot_num)))*"0"+str(shot_num)
        
+           else:
+              name=mycred.Shot.replace(" ","_")+'.'+mycred.Task.replace(" ","_")+'.'+"v001"
+           
+           render_anim(name)
+           
         else:
-           name=mycred.Shot.replace(" ","_")+'.'+mycred.Task.replace(" ","_")+'.'+"v001"
-        render_anim(name)
-        print(name)
+            MessageBox("No shot version available","Render")
+      
         return{'FINISHED'}
     
 class AddUser(bpy.types.Operator):
@@ -374,16 +407,15 @@ class AddUser(bpy.types.Operator):
         return context.active_object is not None
 
     def execute(self, context):
-        mycred=bpy.context.scene.cred
-        global token
-        token_dict=get_token(mycred.Email,mycred.Password)
-        if(token_dict.status_code<300):
-           token=token_dict.json()['access']
-           MessageBox("Successful","Login")
-           
+        mycred=bpy.context.scene.cred 
+        global valid           
+        valid=get_token(mycred.Email,mycred.Password)
+        if(valid):
+              MessageBox("Successful","Login")
+              bpy.app.timers.register(update)
         else:
-           MessageBox("Failed","Login",'ERROR')
-           
+              MessageBox("Failed","Login",'ERROR')
+         
         return{'FINISHED'}
     
 class LogOut(bpy.types.Operator):
@@ -426,6 +458,8 @@ class LogOut(bpy.types.Operator):
         global asset_version
         asset_version={}
         mycred.Asset_version=""
+        first_login=0
+        bpy.app.timers.unregister(update)
         return{'FINISHED'}
 
 def get_names(self,context):
@@ -477,8 +511,8 @@ class Credentials(bpy.types.PropertyGroup):
     
     Asset_version : bpy.props.StringProperty(name="Version")
     Email:bpy.props.StringProperty(name="Username")
-    Password:bpy.props.StringProperty(name="Password",subtype='PASSWORD') 
-
+    Password:bpy.props.StringProperty(name="Password",subtype='PASSWORD')  
+       
 class LoginPanel(bpy.types.Panel):
     bl_label = "Sequence Tab"
     bl_space_type = "VIEW_3D"   
@@ -532,17 +566,14 @@ class LoginPanel(bpy.types.Panel):
 # Assets Portion
 
 def get_asset_list(project_id):
-    x=token
     r=requests.get(MOVCOLAB_URL+"trackables/asset/?project="+str(project_id),headers={'Authorization':'Bearer '+x})
     return r.json()
 
 def get_asset_versions(id):
-    x=token
     r=requests.get(MOVCOLAB_URL+"trackables/asset-version?asset="+str(id),headers={'Authorization':'Bearer '+x})
     return r.json()
 
 def create_asset_version(name,asset):
-    x=token
     data={ 
     "name": "String", 
 
@@ -571,13 +602,17 @@ class Assets(bpy.types.Operator):
         Asset_names.clear()
         global asset_dict
         asset_dict.clear()
-        asset=get_asset_list(project['results'][project_dict[mycred.Project]]['id'])
+        if(mycred.Project!=""):
+           asset=get_asset_list(project['results'][project_dict[mycred.Project]]['id'])
         
-        for i in range(asset['count']):
-            asset_dict[asset['results'][i]['name']]=i
+           for i in range(asset['count']):
+               asset_dict[asset['results'][i]['name']]=i
         
-        for i in range(asset['count']):
-            Asset_names.append((asset['results'][i]['name'],asset['results'][i]['name'],""))
+           for i in range(asset['count']):
+               Asset_names.append((asset['results'][i]['name'],asset['results'][i]['name'],""))
+        
+        else:
+            MessageBox("No project available","Assets")
 
         return{'FINISHED'}
 
@@ -592,13 +627,18 @@ class Asset_Version(bpy.types.Operator):
     def execute(self, context):
         mycred=bpy.context.scene.cred        
         global asset_version
-        asset_version=get_asset_versions(asset['results'][asset_dict[mycred.Assets_list]]['id'])
-        if(asset_version['count']!=0):
-           index=asset_version['count']-1
-           mycred.Asset_version=asset_version['results'][index]['name']
+        if(mycred.Assets_list!=""):
+           asset_version=get_asset_versions(asset['results'][asset_dict[mycred.Assets_list]]['id'])
+           if(asset_version['count']!=0):
+              index=asset_version['count']-1
+              mycred.Asset_version=asset_version['results'][index]['name']
            
+           else:
+              mycred.Asset_version="" 
+        
         else:
-           mycred.Asset_version="" 
+            mycred.Asset_version="" 
+            MessageBox("No assets available","Asset Version")
         return{'FINISHED'}
     
 class Render_asset(bpy.types.Operator):
@@ -613,15 +653,18 @@ class Render_asset(bpy.types.Operator):
     def execute(self, context): 
         mycred=bpy.context.scene.cred
         global name_asset 
-        if(asset_version['count']!=0):
-           version_name=mycred.Asset_version
-           shot_num=int(version_name[version_name.find('v')+2:])+1
-           name_asset=mycred.Assets_list.replace(" ","_")+'.'+'v'+(3-len(str(shot_num)))*"0"+str(shot_num)
+        if(mycred.Assets_list!=""):
+           if(asset_version['count']!=0):
+              version_name=mycred.Asset_version
+              shot_num=int(version_name[version_name.find('v')+2:])+1
+              name_asset=mycred.Assets_list.replace(" ","_")+'.'+'v'+(3-len(str(shot_num)))*"0"+str(shot_num)
        
+           else:
+              name_asset=mycred.Assets_list.replace(" ","_")+'.'+"v001"  
+           render_anim(name_asset)
+           
         else:
-           name_asset=mycred.Assets_list.replace(" ","_")+'.'+"v001"  
-        render_anim(name_asset)
-
+           MessageBox("No assets available","Render")
         return{'FINISHED'}
 
 class upload_asset_sequence(bpy.types.Operator):
@@ -635,26 +678,36 @@ class upload_asset_sequence(bpy.types.Operator):
 
     def execute(self, context):
         mycred=bpy.context.scene.cred
-        Asset=asset['results'][asset_dict[mycred.Assets_list]]['id']
+        if(mycred.Assets_list!=""):
+           Asset=asset['results'][asset_dict[mycred.Assets_list]]['id']
         
-        if(asset_version['count']!=0):
-           version_name=mycred.Asset_version
-           shot_num=int(version_name[version_name.find('v')+2:])+1
-           Name=mycred.Assets_list.replace(" ","_")+'.'+'v'+(3-len(str(shot_num)))*"0"+str(shot_num)
+           if(asset_version['count']!=0):
+             version_name=mycred.Asset_version
+             shot_num=int(version_name[version_name.find('v')+2:])+1
+             Name=mycred.Assets_list.replace(" ","_")+'.'+'v'+(3-len(str(shot_num)))*"0"+str(shot_num)
        
+           else:
+             Name=mycred.Assets_list.replace(" ","_")+'.'+"v001"  
+           
+           statuscode=create_asset_version(Name,Asset)
+        
+           if(statuscode==401):
+              MessageBox("Failed","Asset Sequence upload",'ERROR')
+        
+           elif(statuscode==201):
+              MessageBox("Success","Asset Sequence upload")
+           
         else:
-           Name=mycred.Assets_list.replace(" ","_")+'.'+"v001"  
-           
-        statuscode=create_asset_version(name_asset,Asset)
-        
-        if(statuscode==401):
-           MessageBox("Failed","Asset Sequence upload",'ERROR')
-        
-        elif(statuscode==201):
-           MessageBox("Success","Asset Sequence upload")
-           
+              MessageBox("No sequence to upload","Asset Sequence upload")
         return{'FINISHED'}
-       
+
+def update():
+    mycred=bpy.context.scene.cred
+    if (first_login==1):
+        get_token(mycred.Email,mycred.Password)
+        
+    return 5.0
+                      
 class AssetPanel(bpy.types.Panel):
     bl_label = "Asset Tab"
     bl_space_type = "VIEW_3D"   
@@ -687,7 +740,8 @@ class AssetPanel(bpy.types.Panel):
         
         row=layout.row()
         row.operator(upload_asset_sequence.bl_idname, text="Upload Sequence")
-                
+
+                   
 classes = [Credentials,LoginPanel,AssetPanel,AddUser,ProjectInfo,Sequences,Assets,Asset_Version,Render_asset,upload_asset_sequence,Shot_list,Tasks,Render,Create_Shot,Render_animation,Create_Shot_sequence,LogOut]
 def register():
     for cls in classes:
