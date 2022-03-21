@@ -101,9 +101,15 @@ def create_shot_SS(name,shot):
     data["shot"]=shot
     ss_directory=str(directory)+"\\"+str(name)+'.png'
     print(ss_directory)
-    files=[('file',(ss_directory,open(ss_directory,'rb')))]
-    r=requests.post(MOVCOLAB_URL+"trackables/shot-version/",headers={'Authorization':'Bearer '+x},data=data,files=files)
-    return (r.status_code)
+    
+    if(os.path.isfile(ss_directory)):
+        
+      files=[('file',(ss_directory,open(ss_directory,'rb')))]
+      r=requests.post(MOVCOLAB_URL+"trackables/shot-version/",headers={'Authorization':'Bearer '+x},data=data,files=files)
+      return (r.status_code)
+  
+    else:
+        return 101
     
 def create_shot_sequence(name,shot):
     data={ 
@@ -116,9 +122,13 @@ def create_shot_sequence(name,shot):
     data["shot"]=shot
     ss_directory=str(directory)+"\\"+str(name)+'.mp4'
     print(ss_directory)
-    files=[('file',(ss_directory,open(ss_directory,'rb')))]
-    r=requests.post(MOVCOLAB_URL+"trackables/shot-version/",headers={'Authorization':'Bearer '+x},data=data,files=files)
-    return (r.status_code)
+    if(os.path.isfile(ss_directory)):
+       files=[('file',(ss_directory,open(ss_directory,'rb')))]
+       r=requests.post(MOVCOLAB_URL+"trackables/shot-version/",headers={'Authorization':'Bearer '+x},data=data,files=files)
+       return (r.status_code)
+    else:
+       return 101
+      
 
 def get_task(project_id,shot_id):
     r=requests.get(MOVCOLAB_URL+"trackables/task/?project="+str(project_id)+"&linked="+str(shot_id)+"&assigned=1",headers={'Authorization':'Bearer '+str(x)})
@@ -268,6 +278,8 @@ class Create_Shot(bpy.types.Operator):
            elif(statuscode==201):
               MessageBox("Success","Sequence Shot version upload")
               
+           elif(statuscode==101):
+              MessageBox("No such file in the directory","Sequence Shot version upload")
         else:
               MessageBox("No shots to upload","Sequence Shot version upload")
               
@@ -304,6 +316,9 @@ class Create_Shot_sequence(bpy.types.Operator):
           
            elif(statuscode==201):
               MessageBox("Success","Sequence Shot version upload")
+            
+           elif(statuscode==101):
+              MessageBox("No such file in the directory","Sequence Shot version upload")
            
         else:
             MessageBox("No shots to upload","Sequence Shot version upload")
@@ -582,9 +597,14 @@ def create_asset_version(name,asset):
     data["name"]=name
     data["asset"]=asset
     ss_directory=str(directory)+"\\"+str(name)+'.mp4'
-    files=[('file',(ss_directory,open(ss_directory,'rb')))]
-    r=requests.post(MOVCOLAB_URL+"trackables/asset-version/",headers={'Authorization':'Bearer '+x},data=data,files=files)
-    return (r.status_code)
+    
+    if(os.path.isfile(ss_directory)):
+      files=[('file',(ss_directory,open(ss_directory,'rb')))]
+      r=requests.post(MOVCOLAB_URL+"trackables/asset-version/",headers={'Authorization':'Bearer '+x},data=data,files=files)
+      return (r.status_code)
+  
+    else:
+      return 101
         
 class Assets(bpy.types.Operator):
     """Tooltip"""
@@ -696,6 +716,9 @@ class upload_asset_sequence(bpy.types.Operator):
         
            elif(statuscode==201):
               MessageBox("Success","Asset Sequence upload")
+        
+           elif(statuscode==101):
+              MessageBox("No such file in the directory","Asset Sequence upload")
            
         else:
               MessageBox("No sequence to upload","Asset Sequence upload")
@@ -706,7 +729,7 @@ def update():
     if (first_login==1):
         get_token(mycred.Email,mycred.Password)
         
-    return 5.0
+    return 300
                       
 class AssetPanel(bpy.types.Panel):
     bl_label = "Asset Tab"
