@@ -13,7 +13,6 @@ bl_info = {
 import requests
 import json
 import bpy
-import bpy
 import os
 
 filepath = ""
@@ -458,6 +457,8 @@ class LogOut(bpy.types.Operator):
         Asset_names=[]
         global token
         token=""
+        global x
+        x=""
         global project
         project={}
         global sequences
