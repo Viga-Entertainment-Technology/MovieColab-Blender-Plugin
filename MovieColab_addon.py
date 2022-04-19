@@ -19,8 +19,8 @@ import os
 filepath = ""
 directory = ""
 
-MOVCOLAB_URL= 'https://movie-colab-dev-rvz2hoyrua-as.a.run.app/'
-SSO_URL='https://viga-sso-stage-u44si7afja-as.a.run.app/'
+MOVCOLAB_URL= 'https://movie-colab-prod-service-facgkefmpa-as.a.run.app/'
+SSO_URL='https://sso-prod-service-txevaj6mmq-as.a.run.app/'
 
 valid=False
 
