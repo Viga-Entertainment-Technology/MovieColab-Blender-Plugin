@@ -1,4 +1,4 @@
-# MovieColab-Blender-Plugin
+# MovieColab-Blender-Plugin(Testing)
 Blender Add-on for MovieColab.
 
 About:
@@ -16,6 +16,3 @@ Steps for installation:
 3) Click on install in right upper corner and select the add on file you just downloaded from github.
 
 4) Before using add-on save your project as it uses the project directory to save your rendered images and aniamtions.
-
-
-![Alt text](https://github.com/Viga-Entertainment-Technology/MovieColab-Blender-Plugin/blob/main/Screenshots/BlenderMovieColab.gif)
